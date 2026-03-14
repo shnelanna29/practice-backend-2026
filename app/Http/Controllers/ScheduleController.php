@@ -4,15 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\ScheduleItem;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
+use Carbon\Carbon;
 
 class ScheduleController extends Controller
 {
-    // Список занятий
+    // Список занятий (доступно всем авторизованным)
     public function index(Request $request)
     {
         $query = ScheduleItem::with('classType')->orderBy('start_time');
 
+        // Фильтрация по дате (опционально)
         if ($request->has('date')) {
             $query->whereDate('start_time', $request->date);
         }
@@ -39,12 +41,6 @@ class ScheduleController extends Controller
 
         $item = ScheduleItem::create($validated);
 
-        Log::info('Админ создал новое занятие', [
-            'admin_id' => $request->user()->id,
-            'schedule_item_id' => $item->id,
-            'data' => $validated
-        ]);
-
         return response()->json(['message' => 'Занятие создано', 'data' => $item], 201);
     }
 
@@ -52,7 +48,7 @@ class ScheduleController extends Controller
     public function update(Request $request, $id)
     {
         $item = ScheduleItem::findOrFail($id);
-        
+
         $validated = $request->validate([
             'class_type_id' => 'sometimes|exists:class_types,id',
             'start_time' => 'sometimes|date',
@@ -62,12 +58,6 @@ class ScheduleController extends Controller
 
         $item->update($validated);
 
-        Log::info('Админ обновил занятие', [
-            'admin_id' => $request->user()->id,
-            'schedule_item_id' => $item->id,
-            'changes' => $validated
-        ]);
-
         return response()->json(['message' => 'Занятие обновлено', 'data' => $item]);
     }
 
@@ -75,12 +65,6 @@ class ScheduleController extends Controller
     public function destroy($id)
     {
         $item = ScheduleItem::findOrFail($id);
-        
-        Log::info('Админ удалил занятие', [
-            'admin_id' => request()->user()->id,
-            'schedule_item_id' => $item->id
-        ]);
-
         $item->delete();
 
         return response()->json(['message' => 'Занятие удалено']);

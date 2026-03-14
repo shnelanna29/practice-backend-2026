@@ -6,7 +6,7 @@ use App\Models\Booking;
 use App\Models\ScheduleItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Database\QueryException;
 
 class BookingController extends Controller
 {
@@ -40,48 +40,27 @@ class BookingController extends Controller
 
         $scheduleItem = ScheduleItem::findOrFail($validated['schedule_item_id']);
 
-        Log::info('Попытка бронирования занятия', [
-            'user_id' => $user->id,
-            'user_email' => $user->email,
-            'schedule_item_id' => $scheduleItem->id,
-            'start_time' => $scheduleItem->start_time
-        ]);
-
         // 1. Проверка: занятие еще не началось?
         if ($scheduleItem->start_time->isPast()) {
-            Log::warning('Отказ в бронировании: занятие уже прошло или идет', [
-                'user_id' => $user->id,
-                'schedule_item_id' => $scheduleItem->id
-            ]);
             return response()->json(['message' => 'Нельзя записаться на занятие, которое уже прошло или идет'], 422);
         }
 
         // 2. Проверка: есть ли места?
         if ($scheduleItem->booked_count >= $scheduleItem->capacity) {
-            Log::warning('Отказ в бронировании: нет свободных мест', [
-                'user_id' => $user->id,
-                'schedule_item_id' => $scheduleItem->id,
-                'capacity' => $scheduleItem->capacity,
-                'booked' => $scheduleItem->booked_count
-            ]);
             return response()->json(['message' => 'Мест нет'], 422);
         }
 
-        // 3. Проверка: не записан ли уже пользователь? (Ищем ТОЛЬКО подтвержденные брони)
+        // 3. Проверка: не записан ли уже пользователь? (Ищем только активные брони)
         $exists = Booking::where('user_id', $user->id)
             ->where('schedule_item_id', $scheduleItem->id)
             ->where('status', 'confirmed')
             ->exists();
 
         if ($exists) {
-            Log::warning('Отказ в бронировании: пользователь уже записан', [
-                'user_id' => $user->id,
-                'schedule_item_id' => $scheduleItem->id
-            ]);
             return response()->json(['message' => 'Вы уже записаны на это занятие'], 422);
         }
 
-        // 4. Проверка: нет ли пересечений по времени?
+        // 4. Проверка: нет ли пересечений по времени с другими занятиями пользователя?
         $conflict = Booking::join('schedule_items', 'bookings.schedule_item_id', '=', 'schedule_items.id')
             ->where('bookings.user_id', $user->id)
             ->where('bookings.status', 'confirmed')
@@ -96,33 +75,41 @@ class BookingController extends Controller
             ->exists();
 
         if ($conflict) {
-            Log::warning('Отказ в бронировании: конфликт расписания (пересечение времени)', [
-                'user_id' => $user->id,
-                'new_schedule_id' => $scheduleItem->id,
-                'new_start' => $scheduleItem->start_time,
-                'new_end' => $scheduleItem->end_time
-            ]);
             return response()->json(['message' => 'У вас есть запись на другое занятие в это время'], 422);
         }
 
         // Создаем бронь в транзакции
-        DB::transaction(function () use ($user, $scheduleItem) {
-            $booking = Booking::create([
-                'user_id' => $user->id,
-                'schedule_item_id' => $scheduleItem->id,
-                'status' => 'confirmed',
-            ]);
+        try {
+            DB::transaction(function () use ($user, $scheduleItem) {
+                // Повторная проверка внутри транзакции для безопасности (на случай гонки данных)
+                $existsNow = Booking::where('user_id', $user->id)
+                    ->where('schedule_item_id', $scheduleItem->id)
+                    ->where('status', 'confirmed')
+                    ->lockForUpdate()
+                    ->exists();
 
-            $scheduleItem->increment('booked_count');
+                if ($existsNow) {
+                    throw new \Exception('Вы уже записаны на это занятие');
+                }
 
-            Log::info('Бронирование успешно выполнено', [
-                'booking_id' => $booking->id,
-                'user_id' => $user->id,
-                'schedule_item_id' => $scheduleItem->id
-            ]);
-        });
+                if ($scheduleItem->booked_count >= $scheduleItem->capacity) {
+                    throw new \Exception('Мест больше нет');
+                }
 
-        return response()->json(['message' => 'Вы успешно записаны!'], 201);
+                $booking = Booking::create([
+                    'user_id' => $user->id,
+                    'schedule_item_id' => $scheduleItem->id,
+                    'status' => 'confirmed',
+                ]);
+
+                $scheduleItem->increment('booked_count');
+            });
+
+            return response()->json(['message' => 'Вы успешно записаны!'], 201);
+
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     // Отмена брони
@@ -131,42 +118,24 @@ class BookingController extends Controller
         $user = $request->user();
         $booking = Booking::findOrFail($id);
 
-        Log::info('Попытка отмены брони', [
-            'user_id' => $user->id,
-            'booking_id' => $booking->id,
-            'booking_owner_id' => $booking->user_id,
-            'role' => $user->role
-        ]);
-
-        // Проверка прав
+        // Проверка прав: клиент может отменить только свою бронь
         if ($user->role === 'client' && $booking->user_id !== $user->id) {
-            Log::alert('Попытка отмены чужой брони!', [
-                'actor_id' => $user->id,
-                'victim_booking_id' => $booking->id
-            ]);
             return response()->json(['message' => 'Доступ запрещен'], 403);
+        }
+
+        // Нельзя отменить после начала занятия
+        if ($booking->scheduleItem->start_time->isPast()) {
+            return response()->json(['message' => 'Нельзя отменить бронь после начала занятия'], 422);
         }
 
         // Недопустимый переход статуса: нельзя отменить уже отмененное
         if ($booking->status === 'cancelled') {
-            Log::warning('Попытка повторной отмены брони', ['booking_id' => $booking->id]);
             return response()->json(['message' => 'Бронь уже отменена'], 422);
-        }
-
-        // Нельзя отменить после начала
-        if ($booking->scheduleItem->start_time->isPast()) {
-            Log::warning('Отказ в отмене: занятие уже началось', ['booking_id' => $booking->id]);
-            return response()->json(['message' => 'Нельзя отменить бронь после начала занятия'], 422);
         }
 
         DB::transaction(function () use ($booking) {
             $booking->update(['status' => 'cancelled']);
             $booking->scheduleItem->decrement('booked_count');
-
-            Log::info('Бронь успешно отменена', [
-                'booking_id' => $booking->id,
-                'user_id' => $booking->user_id
-            ]);
         });
 
         return response()->json(['message' => 'Бронь отменена']);
