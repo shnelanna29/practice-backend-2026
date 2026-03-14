@@ -4,16 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\ScheduleItem;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Log;
 
 class ScheduleController extends Controller
 {
-    // Список занятий (доступно всем авторизованным)
+    // Список занятий
     public function index(Request $request)
     {
         $query = ScheduleItem::with('classType')->orderBy('start_time');
 
-        // Фильтрация по дате (опционально)
         if ($request->has('date')) {
             $query->whereDate('start_time', $request->date);
         }
@@ -40,6 +39,12 @@ class ScheduleController extends Controller
 
         $item = ScheduleItem::create($validated);
 
+        Log::info('Админ создал новое занятие', [
+            'admin_id' => $request->user()->id,
+            'schedule_item_id' => $item->id,
+            'data' => $validated
+        ]);
+
         return response()->json(['message' => 'Занятие создано', 'data' => $item], 201);
     }
 
@@ -57,6 +62,12 @@ class ScheduleController extends Controller
 
         $item->update($validated);
 
+        Log::info('Админ обновил занятие', [
+            'admin_id' => $request->user()->id,
+            'schedule_item_id' => $item->id,
+            'changes' => $validated
+        ]);
+
         return response()->json(['message' => 'Занятие обновлено', 'data' => $item]);
     }
 
@@ -64,6 +75,12 @@ class ScheduleController extends Controller
     public function destroy($id)
     {
         $item = ScheduleItem::findOrFail($id);
+        
+        Log::info('Админ удалил занятие', [
+            'admin_id' => request()->user()->id,
+            'schedule_item_id' => $item->id
+        ]);
+
         $item->delete();
 
         return response()->json(['message' => 'Занятие удалено']);
