@@ -1,241 +1,115 @@
 # Booking API (Laravel)
 
-REST API для бронирования ресурсов (занятий) в студии. Проект подготовлен для преддипломной практики и включает JWT-аутентификацию, роли, расписание, бронирования, отзывы, тесты, OpenAPI и Docker.
+REST API для бронирования ресурсов (занятий) в студии. Проект выполнен в формате преддипломной практики и покрывает основные требования: регистрация/логин, роли, расписание, бронирования, отзывы, OpenAPI и Docker.
 
-## Предметная область и сущности
+## Предметная область
 
-- **Resource (Ресурс)**: занятие в расписании (`schedule_items`)
-- **ClassType (Характеристика ресурса)**: тип занятия (`class_types`)
-- **Booking (Бронирование)**: запись пользователя на занятие (`bookings`)
-- **Review (Отзыв)**: отзыв и оценка после завершенного занятия (`reviews`)
-- **User**: роли `admin` и `client` (`users`)
+- **Ресурс**: занятие в расписании (`ScheduleItem`)
+- **Характеристики ресурса**: тип занятия (`ClassType`)
+- **Бронирование**: запись пользователя на занятие
+- **Отзывы**: оценка и комментарий после завершенного занятия
 
 ## Стек
 
 - PHP 8.3, Laravel 12
-- JWT (Bearer Token)
+- JWT-аутентификация (Bearer)
 - MySQL 8
 - PHPUnit
 - OpenAPI 3
 - Docker / Docker Compose
 
-## Где что лежит
+## Что реализовано
 
-- Контроллеры: `app/Http/Controllers`
-- Модели: `app/Models`
-- Маршруты: `routes/api.php`
-- Миграции: `database/migrations`
-- Сидеры: `database/seeders`
-- ER-диаграмма: `docs/er-diagram.png` (+ `ER_1.xml` в корне практики)
-- OpenAPI: `docs/openapi.yaml`
+- JWT-аутентификация: регистрация, логин, профиль, logout
+- Роли: `admin` и `client`
+- Расписание: список, фильтры, пагинация, расписание на день/неделю
+- Поиск свободных ресурсов по дате и времени
+- Бронирование: создание, отмена, ограничения, конфликты по времени
+- Отзывы: только после завершенного бронирования, средний рейтинг
+- OpenAPI файл и Swagger UI
+- Автотесты (включая авторизацию и конфликты)
 
----
+## Структура проекта
 
-## Архитектура и поток данных
+- `app/Http/Controllers` — контроллеры API
+- `app/Models` — модели
+- `routes/api.php` — маршруты API
+- `database/migrations` — миграции
+- `database/seeders` — сидеры
+- `docs/er-diagram.png` — ER-диаграмма
+- `docs/openapi.yaml` — OpenAPI контракт
 
-### Аутентификация (JWT)
-JWT-токен выдается при регистрации/логине и используется в заголовке:
-```
-Authorization: Bearer <token>
-```
+## Установка и запуск (локально)
 
-**Флоу:**
-1. `POST /api/register` → создаёт пользователя → возвращает `access_token`
-2. `POST /api/login` → проверяет пароль → возвращает `access_token`
-3. `GET /api/me` → отдаёт профиль (только с токеном)
-4. `POST /api/logout` → токен попадает в blacklist (Cache)
-
-### Источник данных
-Данные хранятся в MySQL и создаются миграциями:
-- `class_types`, `schedule_items`, `bookings`, `reviews`, `users`
-
-Сиды:
-- `ClassTypeSeeder` — типы занятий
-- `UserSeeder` — admin и client
-- `ScheduleSeeder` — расписание занятий
-
----
-
-## Контроллеры и ответственность
-
-### AuthController
-- `register` — создание пользователя, выдача JWT
-- `login` — проверка пароля, выдача JWT
-- `logout` — инвалидирует текущий JWT (blacklist)
-- `me` — профиль текущего пользователя
-
-### ScheduleController
-- `index` — список занятий с фильтрацией, сортировкой и пагинацией
-- `show` — детали одного занятия
-- `store/update/destroy` — CRUD расписания (только admin)
-- `schedule` — расписание по конкретному занятию (день/неделя)
-- `scheduleForClassType` — расписание по типу занятия (день/неделя)
-- `available` — поиск свободных занятий по дате/времени
-
-### BookingController
-- `store` — создание бронирования с проверками:
-  - занятие не в прошлом
-  - есть свободные места
-  - пользователь не записан на это занятие
-  - нет пересечения по времени с другими бронями
-- `destroy` — отмена бронирования (клиент — только своё, admin — любое)
-- `myBookings` — список броней текущего пользователя
-- `index` — список всех броней (только admin)
-
-### ReviewController
-- `index` — отзывы и средний рейтинг по занятию
-- `store` — отзыв возможен только:
-  - по своему бронированию
-  - после завершения занятия
-  - только один раз на бронирование
-
-### ClassTypeController
-- `index` — список типов занятий (публично)
-- `store/update/destroy` — CRUD типов занятий (admin)
-
----
-
-## Middleware
-
-### JwtAuthenticate
-Проверяет `Authorization: Bearer <token>`, декодирует JWT и подставляет пользователя в `request->user()`.
-
-### RoleMiddleware
-Доступ по роли (`admin`/`client`) для защищённых маршрутов.
-
----
-
-## Фильтрация и пагинация
-
-### ScheduleController::index
-Фильтры:
-- `date=YYYY-MM-DD` — дата занятия
-- `class_type_id` — тип занятия
-- `capacity_min` — минимальная вместимость
-- `search` — поиск по названию типа
-
-Сортировка:
-- `sort=start_time|end_time|capacity|created_at|booked_count`
-- `direction=asc|desc`
-
-Пагинация:
-- `per_page` (макс. 50)
-- Возвращает стандартный Laravel paginator (`current_page`, `data`, `total` и т.д.)
-
-### BookingController::myBookings
-Фильтры:
-- `status=confirmed|cancelled`
-- `only_future=true` — только будущие брони
-- сортировка по `created_at` или `status`
-
-### ReviewController::index
-Фильтр:
-- `rating=1..5`
-
-### ScheduleController::available (поиск свободных занятий)
-Параметры:
-- `date`, `start_time`, `end_time`
-- `capacity_min`, `class_type_id`
-
-Логика:
-- берутся занятия в указанном интервале
-- проверяется `capacity > booked_count`
-- фильтруется по `class_type_id` и вместимости
-
----
-
-## Docker
-
-### Запуск
-```
-docker-compose up --build
-```
-
-### Миграции и сиды в контейнере
-```
-docker-compose exec app php artisan migrate --seed
-```
-
-### Конфиг
-- `.env.docker` — переменные окружения для Docker
-- MySQL доступен как `db` (внутри контейнерной сети)
-
----
-
-## Запуск локально
-
-1. Установка зависимостей
-```
+```bash
 composer install
-```
-
-2. Настройка окружения
-```
 copy .env.example .env
 ```
 
-3. Сгенерировать JWT секрет
-```
+Сгенерировать JWT секрет:
+
+```bash
 php -r "echo bin2hex(random_bytes(32));"
 ```
 
-4. Записать в `.env`
+Добавить значение в `.env`:
+
 ```
 JWT_SECRET=ваш_секрет
 JWT_TTL=60
 ```
 
-5. Миграции и сиды
-```
+Запуск миграций и сидов:
+
+```bash
 php artisan migrate --seed
 ```
 
-6. Запуск сервера
-```
+Запуск сервера:
+
+```bash
 php artisan serve
 ```
 
----
+## Запуск через Docker
 
-## Тесты (PHPUnit)
+```bash
+docker-compose up --build
+```
+
+Выполнить миграции и сиды внутри контейнера:
+
+```bash
+docker-compose exec app php artisan migrate --seed
+```
+
+Swagger UI доступен по адресу:
 
 ```
+http://localhost:8080/docs
+```
+
+## Тесты
+
+```bash
 php artisan test
 ```
 
 В Docker:
-```
+
+```bash
 docker-compose exec app php artisan test
 ```
 
----
+## OpenAPI / Swagger
 
-## Postman тесты
+- Файл спецификации: `docs/openapi.yaml`
+- Swagger UI: `http://localhost:8080/docs`
 
-Готовой коллекции в репозитории нет (папка `postman/` содержит пустую коллекцию).  
-Рекомендуемый способ: импорт OpenAPI.
+## Роли и доступ
 
-### Вариант 1: импорт OpenAPI
-1. Открыть Postman → Import → `docs/openapi.yaml`
-2. Создать Environment:
-   - `baseUrl` = `http://localhost:8080`
-   - `token` = JWT из `/api/login`
-3. В заголовках запросов:
-   - `Authorization: Bearer {{token}}`
-
-### Вариант 2: вручную
-1. Выполнить `POST /api/login` и сохранить `access_token`
-2. Прописать токен в Authorization для остальных запросов
-3. Запустить коллекцию через Runner
-
----
-
-## Swagger / OpenAPI
-
-- Файл: `docs/openapi.yaml`
-- UI (через Scribe): `http://localhost:8080/docs`
-
----
+- `client` — просмотр расписания, бронирование, отзывы
+- `admin` — CRUD расписания и типов ресурсов, просмотр всех бронирований
 
 ## Основные маршруты
 
@@ -245,8 +119,8 @@ docker-compose exec app php artisan test
 - `POST /api/logout`
 - `GET /api/me`
 
-**Типы ресурсов**
-- `GET /api/class-types`
+**Типы ресурсов (характеристики)**
+- `GET /api/class-types` (публичный список)
 - `POST /api/admin/class-types` (admin)
 - `PUT /api/admin/class-types/{id}` (admin)
 - `DELETE /api/admin/class-types/{id}` (admin)
@@ -254,12 +128,12 @@ docker-compose exec app php artisan test
 **Расписание**
 - `GET /api/schedule`
 - `GET /api/schedule/{id}`
-- `GET /api/schedule/{id}/schedule`
-- `GET /api/class-types/{id}/schedule`
-- `GET /api/schedule/available`
+- `GET /api/schedule/{id}/schedule` (день/неделя)
+- `GET /api/class-types/{id}/schedule` (день/неделя)
 - `POST /api/admin/schedule` (admin)
 - `PUT /api/admin/schedule/{id}` (admin)
 - `DELETE /api/admin/schedule/{id}` (admin)
+- `GET /api/schedule/available`
 
 **Бронирования**
 - `POST /api/bookings`
@@ -271,16 +145,16 @@ docker-compose exec app php artisan test
 - `GET /api/schedule/{scheduleItemId}/reviews`
 - `POST /api/schedule/{scheduleItemId}/reviews`
 
----
-
 ## Git workflow для сдачи
 
-Работа ведется в ветке `dev`. Для сдачи требуется PR/MR из `dev` в `main` в форке преподавателя.
+Работа ведется в ветке `dev`. Для оформления сдачи в форке:
 
-Пример команд:
-```
+```bash
 git remote add upstream <TEACHER_REPO_URL>
 git fetch upstream
 git checkout -b dev
 git push origin dev
 ```
+
+Далее оформить PR/MR из `dev` в `main` в форке репозитория преподавателя.
+
