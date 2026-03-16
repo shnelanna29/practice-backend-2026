@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\ScheduleItem;
+use App\Models\ClassType;
 use Illuminate\Database\Seeder;
 use Carbon\Carbon;
 
@@ -13,7 +14,10 @@ class ScheduleSeeder extends Seeder
      */
     public function run(): void
     {
-        $classTypes = [1, 2, 3, 4]; // ID типов занятий
+        $classTypes = ClassType::query()->pluck('id')->all();
+        if (empty($classTypes)) {
+            return;
+        }
         $startDate = Carbon::now()->addDays(1);
 
         $data = [];
