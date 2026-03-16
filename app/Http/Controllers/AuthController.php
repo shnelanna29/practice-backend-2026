@@ -17,14 +17,14 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'role' => 'sometimes|in:client,admin',
+            // ❌ УДАЛИТЕ 'role' из валидации!
         ]);
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'role' => $validated['role'] ?? 'client',
+            'role' => 'client', // ✅ ВСЕГДА 'client' при регистрации
         ]);
 
         Log::info('Новая регистрация пользователя', [
@@ -58,7 +58,6 @@ class AuthController extends Controller
                 'email' => $request->email,
                 'ip' => $request->ip()
             ]);
-            
             throw ValidationException::withMessages([
                 'email' => ['Неверные учетные данные'],
             ]);

@@ -1,0 +1,14 @@
+# Исключаем из сборки
+node_modules/
+npm-debug.log
+vendor/
+*.log
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+.env
+storage/logs/*
+public/storage
+bootstrap/cache/*

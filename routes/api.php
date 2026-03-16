@@ -5,18 +5,18 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\BookingController;
+use App\Http\Controllers\ReviewController;
 
 // ==========================================
 // ПУБЛИЧНЫЕ МАРШРУТЫ (Доступны всем)
 // ==========================================
 Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->name('login');
 
 // ==========================================
 // ЗАЩИЩЕННЫЕ МАРШРУТЫ (Требуется токен)
 // ==========================================
 Route::middleware('auth:sanctum')->group(function () {
-    
     // --- Аутентификация ---
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
@@ -24,6 +24,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // --- Расписание (Чтение доступно всем авторизованным) ---
     Route::get('/schedule', [ScheduleController::class, 'index']);
     Route::get('/schedule/{id}', [ScheduleController::class, 'show']);
+    
+    // --- Расписание ресурса (день/неделя) и поиск свободных ---
+    Route::get('/schedule/{id}/schedule', [ScheduleController::class, 'schedule']);
+    Route::get('/schedule/available', [ScheduleController::class, 'available']);
 
     // --- Админские маршруты для Расписания ---
     Route::middleware('role:admin')->group(function () {
@@ -39,4 +43,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // --- Админские маршруты для Броней ---
     Route::get('/admin/bookings', [BookingController::class, 'index'])->middleware('role:admin');
+
+    // --- Отзывы ---
+    Route::get('/schedule/{scheduleItemId}/reviews', [ReviewController::class, 'index']);
+    Route::post('/schedule/{scheduleItemId}/reviews', [ReviewController::class, 'store']);
 });
