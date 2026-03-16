@@ -1,93 +1,160 @@
-# Преддипломная практика — Бэкенд-разработка
+# Booking API (Laravel)
 
-Веб-программирование | 2026
+REST API для бронирования ресурсов (занятий) в студии. Проект выполнен в формате преддипломной практики и покрывает основные требования: регистрация/логин, роли, расписание, бронирования, отзывы, OpenAPI и Docker.
 
----
+## Предметная область
 
-## О практике
+- **Ресурс**: занятие в расписании (`ScheduleItem`)
+- **Характеристики ресурса**: тип занятия (`ClassType`)
+- **Бронирование**: запись пользователя на занятие
+- **Отзывы**: оценка и комментарий после завершенного занятия
 
-Цель практики — самостоятельно спроектировать и реализовать REST API для реального сценария использования. Вы выбираете один из двух проектов, проектируете базу данных и структуру API, пишете код, тесты, документацию и упаковываете всё в Docker.
+## Стек
 
-**Длительность:** хтобзнал
-**Формат:** еженедельные онлайн-встречи + очные встречи раз в 2 недели
+- PHP 8.3, Laravel 12
+- JWT-аутентификация (Bearer)
+- MySQL 8
+- PHPUnit
+- OpenAPI 3
+- Docker / Docker Compose
 
----
+## Что реализовано
 
-## Проекты
+- JWT-аутентификация: регистрация, логин, профиль, logout
+- Роли: `admin` и `client`
+- Расписание: список, фильтры, пагинация, расписание на день/неделю
+- Поиск свободных ресурсов по дате и времени
+- Бронирование: создание, отмена, ограничения, конфликты по времени
+- Отзывы: только после завершенного бронирования, средний рейтинг
+- OpenAPI файл и Swagger UI
+- Автотесты (включая авторизацию и конфликты)
 
-| #   | Проект                                   | Описание                                                           |
-| --- | ---------------------------------------- | ------------------------------------------------------------------ |
-| 1   | [Booking API](./projects/booking-api.md) | Система бронирования ресурсов (переговорки, номера, рабочие места) |
-| 2   | [Survey API](./projects/survey-api.md)   | Сервис опросов и голосований с аналитикой результатов              |
+## Структура проекта
 
-Выберите один проект и сообщите преподавателю до первой встречи.
+- `app/Http/Controllers` — контроллеры API
+- `app/Models` — модели
+- `routes/api.php` — маршруты API
+- `database/migrations` — миграции
+- `database/seeders` — сидеры
+- `docs/er-diagram.png` — ER-диаграмма
+- `docs/openapi.yaml` — OpenAPI контракт
 
----
+## Установка и запуск (локально)
 
-## Стек (на выбор)
-
-- **PHP** — Laravel
-- **Node.js** — Express.js
-- **Python** — Flask / Django
-- **Go** — Gin / Echo
-
-База данных: MySQL или PostgreSQL.
-
----
-
-## Чекпоинты
-
-| #   | Тема                       |
-| --- | -------------------------- |
-| 1   | Проектирование и старт     |
-| 2   | Авторизация и базовый CRUD |
-| 3   | Основная бизнес-логика     |
-| 4   | Продвинутый функционал     |
-| 5   | Тесты, Swagger, Docker     |
-| 6   | Финализация и защита       |
-
-Требования к каждому чекпоинту публикуются в начале соответствующей недели.
-
----
-
-## Как работать
-
-1. **Форкните** этот репозиторий
-2. Создайте ветку `dev` — работайте в ней
-3. На каждый чекпоинт открывайте **Merge Request** в свой форк: `dev → main`
-4. Проводится ревью и комментаруется в MR
-
-### Структура вашего репозитория
-
-```
-├── README.md          # Описание проекта, инструкция по запуску
-├── docs/
-│   └── er-diagram.png # ER-диаграмма (или ссылка на dbdiagram.io)
-├── src/               # Код приложения (структура зависит от стека)
-├── tests/             # Автотесты
-├── Dockerfile
-├── docker-compose.yml
-└── .gitignore
+```bash
+composer install
+copy .env.example .env
 ```
 
----
+Сгенерировать JWT секрет:
 
-## Требования к сдаче
+```bash
+php -r "echo bin2hex(random_bytes(32));"
+```
 
-- [ ] REST API — корректные HTTP-методы и коды ответов
-- [ ] Аутентификация (JWT)
-- [ ] Валидация входных данных
-- [ ] Swagger / OpenAPI документация
-- [ ] Минимум 5 автотестов
-- [ ] Docker — проект запускается через `docker-compose up`
-- [ ] README с описанием и инструкцией по запуску
-- [ ] Осмысленная история коммитов
+Добавить значение в `.env`:
 
----
+```
+JWT_SECRET=ваш_секрет
+JWT_TTL=60
+```
 
-## Полезные ссылки
+Запуск миграций и сидов:
 
-- [Swagger/OpenAPI](https://swagger.io/specification/)
-- [dbdiagram.io](https://dbdiagram.io) — проектирование ER-диаграмм
-- [Postman](https://www.postman.com) — тестирование API
-- [Docker — Getting Started](https://docs.docker.com/get-started/)
+```bash
+php artisan migrate --seed
+```
+
+Запуск сервера:
+
+```bash
+php artisan serve
+```
+
+## Запуск через Docker
+
+```bash
+docker-compose up --build
+```
+
+Выполнить миграции и сиды внутри контейнера:
+
+```bash
+docker-compose exec app php artisan migrate --seed
+```
+
+Swagger UI доступен по адресу:
+
+```
+http://localhost:8080/docs
+```
+
+## Тесты
+
+```bash
+php artisan test
+```
+
+В Docker:
+
+```bash
+docker-compose exec app php artisan test
+```
+
+## OpenAPI / Swagger
+
+- Файл спецификации: `docs/openapi.yaml`
+- Swagger UI: `http://localhost:8080/docs`
+
+## Роли и доступ
+
+- `client` — просмотр расписания, бронирование, отзывы
+- `admin` — CRUD расписания и типов ресурсов, просмотр всех бронирований
+
+## Основные маршруты
+
+**Auth**
+- `POST /api/register`
+- `POST /api/login`
+- `POST /api/logout`
+- `GET /api/me`
+
+**Типы ресурсов (характеристики)**
+- `GET /api/class-types` (публичный список)
+- `POST /api/admin/class-types` (admin)
+- `PUT /api/admin/class-types/{id}` (admin)
+- `DELETE /api/admin/class-types/{id}` (admin)
+
+**Расписание**
+- `GET /api/schedule`
+- `GET /api/schedule/{id}`
+- `GET /api/schedule/{id}/schedule` (день/неделя)
+- `GET /api/class-types/{id}/schedule` (день/неделя)
+- `POST /api/admin/schedule` (admin)
+- `PUT /api/admin/schedule/{id}` (admin)
+- `DELETE /api/admin/schedule/{id}` (admin)
+- `GET /api/schedule/available`
+
+**Бронирования**
+- `POST /api/bookings`
+- `DELETE /api/bookings/{id}`
+- `GET /api/my-bookings`
+- `GET /api/admin/bookings` (admin)
+
+**Отзывы**
+- `GET /api/schedule/{scheduleItemId}/reviews`
+- `POST /api/schedule/{scheduleItemId}/reviews`
+
+## Git workflow для сдачи
+
+Работа ведется в ветке `dev`. Для оформления сдачи в форке:
+
+```bash
+git remote add upstream <TEACHER_REPO_URL>
+git fetch upstream
+git checkout -b dev
+git push origin dev
+```
+
+Далее оформить PR/MR из `dev` в `main` в форке репозитория преподавателя.
+

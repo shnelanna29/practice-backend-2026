@@ -1,0 +1,392 @@
+openapi: 3.0.3
+info:
+  title: Dance Studio Booking API
+  version: 1.0.0
+  description: REST API для бронирования ресурсов (занятий) с JWT-аутентификацией.
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: Auth
+  - name: ClassTypes
+  - name: Schedule
+  - name: Bookings
+  - name: Reviews
+security:
+  - bearerAuth: []
+paths:
+  /api/register:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Регистрация пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Создано
+  /api/login:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Логин и выдача JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: OK
+  /api/logout:
+    post:
+      tags: [Auth]
+      summary: Logout (инвалидация JWT)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Неавторизован
+  /api/me:
+    get:
+      tags: [Auth]
+      summary: Профиль текущего пользователя
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Неавторизован
+
+  /api/class-types:
+    get:
+      tags: [ClassTypes]
+      security: []
+      summary: Список типов ресурсов
+      responses:
+        '200':
+          description: OK
+  /api/admin/class-types:
+    post:
+      tags: [ClassTypes]
+      summary: Создать тип ресурса (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClassTypeCreate'
+      responses:
+        '201':
+          description: Создано
+  /api/admin/class-types/{id}:
+    put:
+      tags: [ClassTypes]
+      summary: Обновить тип ресурса (admin)
+      parameters:
+        - in: path
+          name: id
+          schema: { type: integer }
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClassTypeUpdate'
+      responses:
+        '200':
+          description: OK
+    delete:
+      tags: [ClassTypes]
+      summary: Удалить тип ресурса (admin)
+      parameters:
+        - in: path
+          name: id
+          schema: { type: integer }
+          required: true
+      responses:
+        '200':
+          description: OK
+
+  /api/schedule:
+    get:
+      tags: [Schedule]
+      summary: Список расписания с фильтрами
+      parameters:
+        - in: query
+          name: date
+          schema: { type: string, format: date }
+        - in: query
+          name: class_type_id
+          schema: { type: integer }
+        - in: query
+          name: capacity_min
+          schema: { type: integer }
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: sort
+          schema: { type: string }
+        - in: query
+          name: direction
+          schema: { type: string, enum: [asc, desc] }
+        - in: query
+          name: per_page
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+  /api/schedule/{id}:
+    get:
+      tags: [Schedule]
+      summary: Детали занятия
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+  /api/admin/schedule:
+    post:
+      tags: [Schedule]
+      summary: Создать занятие (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleCreate'
+      responses:
+        '201':
+          description: Создано
+  /api/admin/schedule/{id}:
+    put:
+      tags: [Schedule]
+      summary: Обновить занятие (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleUpdate'
+      responses:
+        '200':
+          description: OK
+    delete:
+      tags: [Schedule]
+      summary: Удалить занятие (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+
+  /api/schedule/{id}/schedule:
+    get:
+      tags: [Schedule]
+      summary: Расписание по занятию (на день/неделю)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: date
+          schema: { type: string, format: date }
+        - in: query
+          name: period
+          schema: { type: string, enum: [day, week] }
+      responses:
+        '200':
+          description: OK
+  /api/class-types/{id}/schedule:
+    get:
+      tags: [Schedule]
+      summary: Расписание по типу ресурса (на день/неделю)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: date
+          schema: { type: string, format: date }
+        - in: query
+          name: period
+          schema: { type: string, enum: [day, week] }
+      responses:
+        '200':
+          description: OK
+  /api/schedule/available:
+    get:
+      tags: [Schedule]
+      summary: Поиск свободных ресурсов
+      parameters:
+        - in: query
+          name: date
+          required: true
+          schema: { type: string, format: date }
+        - in: query
+          name: start_time
+          required: true
+          schema: { type: string, example: "10:00" }
+        - in: query
+          name: end_time
+          required: true
+          schema: { type: string, example: "11:00" }
+        - in: query
+          name: capacity_min
+          schema: { type: integer }
+        - in: query
+          name: class_type_id
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+
+  /api/bookings:
+    post:
+      tags: [Bookings]
+      summary: Создать бронирование
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingCreate'
+      responses:
+        '201':
+          description: Создано
+  /api/bookings/{id}:
+    delete:
+      tags: [Bookings]
+      summary: Отменить бронирование
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+  /api/my-bookings:
+    get:
+      tags: [Bookings]
+      summary: Список бронирований текущего пользователя
+      responses:
+        '200':
+          description: OK
+  /api/admin/bookings:
+    get:
+      tags: [Bookings]
+      summary: Список всех бронирований (admin)
+      responses:
+        '200':
+          description: OK
+
+  /api/schedule/{scheduleItemId}/reviews:
+    get:
+      tags: [Reviews]
+      summary: Отзывы по занятию
+      parameters:
+        - in: path
+          name: scheduleItemId
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+    post:
+      tags: [Reviews]
+      summary: Оставить отзыв
+      parameters:
+        - in: path
+          name: scheduleItemId
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewCreate'
+      responses:
+        '201':
+          description: Создано
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [name, email, password, password_confirmation]
+      properties:
+        name: { type: string }
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+        password_confirmation: { type: string, format: password }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+    ClassTypeCreate:
+      type: object
+      required: [name, default_capacity]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        default_capacity: { type: integer, minimum: 1 }
+    ClassTypeUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        default_capacity: { type: integer, minimum: 1 }
+    ScheduleCreate:
+      type: object
+      required: [class_type_id, start_time, end_time, capacity]
+      properties:
+        class_type_id: { type: integer }
+        start_time: { type: string, format: date-time }
+        end_time: { type: string, format: date-time }
+        capacity: { type: integer, minimum: 1 }
+    ScheduleUpdate:
+      type: object
+      properties:
+        class_type_id: { type: integer }
+        start_time: { type: string, format: date-time }
+        end_time: { type: string, format: date-time }
+        capacity: { type: integer, minimum: 1 }
+    BookingCreate:
+      type: object
+      required: [schedule_item_id]
+      properties:
+        schedule_item_id: { type: integer }
+    ReviewCreate:
+      type: object
+      required: [booking_id, rating]
+      properties:
+        booking_id: { type: integer }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        comment: { type: string }
