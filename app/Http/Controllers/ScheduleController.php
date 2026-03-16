@@ -119,6 +119,58 @@ class ScheduleController extends Controller
     }
 
     /**
+     * Расписание по типу ресурса (class type) на день или неделю
+     *
+     * @queryParam date string Format: YYYY-MM-DD. Date for schedule. Example: 2026-03-20
+     * @queryParam period string Schedule period: day or week. Example: week
+     */
+    public function scheduleForClassType($classTypeId, Request $request)
+    {
+        $period = $request->get('period', 'day');
+        $date = $request->get('date', now()->toDateString());
+
+        if ($period === 'week') {
+            $startDate = Carbon::parse($date)->startOfWeek();
+            $endDate = (clone $startDate)->endOfWeek();
+        } else {
+            $startDate = Carbon::parse($date)->startOfDay();
+            $endDate = Carbon::parse($date)->endOfDay();
+        }
+
+        $items = ScheduleItem::with('classType')
+            ->where('class_type_id', $classTypeId)
+            ->whereBetween('start_time', [$startDate, $endDate])
+            ->orderBy('start_time')
+            ->get();
+
+        $grouped = $items->groupBy(function ($item) {
+            return Carbon::parse($item->start_time)->toDateString();
+        });
+
+        return response()->json([
+            'class_type_id' => (int) $classTypeId,
+            'period' => $period,
+            'date_range' => [
+                'start' => $startDate->toDateString(),
+                'end' => $endDate->toDateString(),
+            ],
+            'schedule' => $grouped->map(function ($dayItems) {
+                return $dayItems->map(function ($item) {
+                    return [
+                        'id' => $item->id,
+                        'start_time' => $item->start_time,
+                        'end_time' => $item->end_time,
+                        'class_type' => $item->classType->name,
+                        'capacity' => $item->capacity,
+                        'booked_count' => $item->booked_count,
+                        'available' => $item->capacity - $item->booked_count,
+                    ];
+                });
+            }),
+        ]);
+    }
+
+    /**
      * Поиск свободных ресурсов на заданную дату и время
      * 
      * @queryParam date string required Format: YYYY-MM-DD. Example: 2026-03-20
@@ -144,7 +196,6 @@ class ScheduleController extends Controller
         // Запрос на поиск свободных занятий:
         // 1. Занятие должно быть в тот же день
         // 2. Должно быть достаточно мест
-        // 3. Не должно быть подтверждённых броней, пересекающихся по времени
         $query = ScheduleItem::with('classType')
             ->whereDate('start_time', $date)
             ->where('start_time', '<', $endTime)
@@ -160,17 +211,6 @@ class ScheduleController extends Controller
         if ($request->filled('class_type_id')) {
             $query->where('class_type_id', $request->class_type_id);
         }
-
-        // Исключаем занятия, у которых есть подтверждённые брони, пересекающиеся с запрошенным временем
-        $query->whereDoesntHave('bookings', function ($q) use ($startTime, $endTime) {
-            $q->where('status', 'confirmed')
-              ->where(function ($sub) use ($startTime, $endTime) {
-                  $sub->whereBetween('start_time', [$startTime, $endTime])
-                      ->orWhereBetween('end_time', [$startTime, $endTime])
-                      ->orWhereRaw('? BETWEEN start_time AND end_time', [$startTime])
-                      ->orWhereRaw('? BETWEEN start_time AND end_time', [$endTime]);
-              });
-        });
 
         // Пагинация и сортировка
         $perPage = min((int)$request->get('per_page', 10), 50);

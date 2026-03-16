@@ -6,17 +6,19 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\ClassTypeController;
 
 // ==========================================
 // ПУБЛИЧНЫЕ МАРШРУТЫ (Доступны всем)
 // ==========================================
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login'])->name('login');
+Route::get('/class-types', [ClassTypeController::class, 'index']);
 
 // ==========================================
 // ЗАЩИЩЕННЫЕ МАРШРУТЫ (Требуется токен)
 // ==========================================
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('jwt')->group(function () {
     // --- Аутентификация ---
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
@@ -28,9 +30,15 @@ Route::middleware('auth:sanctum')->group(function () {
     // --- Расписание ресурса (день/неделя) и поиск свободных ---
     Route::get('/schedule/{id}/schedule', [ScheduleController::class, 'schedule']);
     Route::get('/schedule/available', [ScheduleController::class, 'available']);
+    Route::get('/class-types/{id}/schedule', [ScheduleController::class, 'scheduleForClassType']);
 
     // --- Админские маршруты для Расписания ---
     Route::middleware('role:admin')->group(function () {
+        // CRUD типов ресурсов (характеристики)
+        Route::post('/admin/class-types', [ClassTypeController::class, 'store']);
+        Route::put('/admin/class-types/{id}', [ClassTypeController::class, 'update']);
+        Route::delete('/admin/class-types/{id}', [ClassTypeController::class, 'destroy']);
+
         Route::post('/admin/schedule', [ScheduleController::class, 'store']);
         Route::put('/admin/schedule/{id}', [ScheduleController::class, 'update']);
         Route::delete('/admin/schedule/{id}', [ScheduleController::class, 'destroy']);
