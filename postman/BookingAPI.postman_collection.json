@@ -1,0 +1,325 @@
+{
+  "info": {
+    "_postman_id": "b7f8b43f-4a20-4c1a-9b9f-1d7c2a6f1c01",
+    "name": "Booking API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "adminEmail", "value": "admin@studio.com" },
+    { "key": "adminPassword", "value": "password" },
+    { "key": "clientEmail", "value": "client@studio.com" },
+    { "key": "clientPassword", "value": "password" },
+    { "key": "token_admin", "value": "" },
+    { "key": "token_client", "value": "" },
+    { "key": "classTypeId", "value": "" },
+    { "key": "scheduleItemId", "value": "" },
+    { "key": "bookingId", "value": "" },
+    { "key": "reviewId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register Client",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Client\",\"email\":\"{{clientEmail}}\",\"password\":\"{{clientPassword}}\",\"password_confirmation\":\"{{clientPassword}}\"}"
+            }
+          }
+        },
+        {
+          "name": "Login Client",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{clientEmail}}\",\"password\":\"{{clientPassword}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "  pm.collectionVariables.set('token_client', json.access_token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Admin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{adminEmail}}\",\"password\":\"{{adminPassword}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "  pm.collectionVariables.set('token_admin', json.access_token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Me (Client)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_client}}" }],
+            "url": "{{baseUrl}}/api/me"
+          }
+        },
+        {
+          "name": "Logout (Client)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_client}}" }],
+            "url": "{{baseUrl}}/api/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Class Types",
+      "item": [
+        {
+          "name": "List Class Types",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/class-types" }
+        },
+        {
+          "name": "Create Class Type (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token_admin}}" }
+            ],
+            "url": "{{baseUrl}}/api/admin/class-types",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Yoga\",\"description\":\"Relax\",\"default_capacity\":10}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.id) {",
+                  "  pm.collectionVariables.set('classTypeId', json.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Class Type (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token_admin}}" }
+            ],
+            "url": "{{baseUrl}}/api/admin/class-types/{{classTypeId}}",
+            "body": { "mode": "raw", "raw": "{\"description\":\"Updated\"}" }
+          }
+        },
+        {
+          "name": "Delete Class Type (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_admin}}" }],
+            "url": "{{baseUrl}}/api/admin/class-types/{{classTypeId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Schedule",
+      "item": [
+        {
+          "name": "List Schedule",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/schedule?per_page=10" }
+        },
+        {
+          "name": "Schedule Details",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/schedule/{{scheduleItemId}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_client}}" }]
+          }
+        },
+        {
+          "name": "Schedule By Class Type",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_client}}" }],
+            "url": "{{baseUrl}}/api/class-types/{{classTypeId}}/schedule?period=week"
+          }
+        },
+        {
+          "name": "Search Available",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_client}}" }],
+            "url": "{{baseUrl}}/api/schedule/available?date=2026-03-20&start_time=10:00&end_time=11:00"
+          }
+        },
+        {
+          "name": "Create Schedule Item (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token_admin}}" }
+            ],
+            "url": "{{baseUrl}}/api/admin/schedule",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"class_type_id\":{{classTypeId}},\"start_time\":\"2026-04-01T10:00:00\",\"end_time\":\"2026-04-01T11:00:00\",\"capacity\":10}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.id) {",
+                  "  pm.collectionVariables.set('scheduleItemId', json.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Schedule Item (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token_admin}}" }
+            ],
+            "url": "{{baseUrl}}/api/admin/schedule/{{scheduleItemId}}",
+            "body": { "mode": "raw", "raw": "{\"capacity\":15}" }
+          }
+        },
+        {
+          "name": "Delete Schedule Item (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_admin}}" }],
+            "url": "{{baseUrl}}/api/admin/schedule/{{scheduleItemId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "Create Booking (Client)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token_client}}" }
+            ],
+            "url": "{{baseUrl}}/api/bookings",
+            "body": { "mode": "raw", "raw": "{\"schedule_item_id\":{{scheduleItemId}}}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.booking_id) {",
+                  "  pm.collectionVariables.set('bookingId', json.booking_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My Bookings (Client)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_client}}" }],
+            "url": "{{baseUrl}}/api/my-bookings"
+          }
+        },
+        {
+          "name": "All Bookings (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_admin}}" }],
+            "url": "{{baseUrl}}/api/admin/bookings"
+          }
+        },
+        {
+          "name": "Cancel Booking (Client)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_client}}" }],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reviews",
+      "item": [
+        {
+          "name": "List Reviews",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_client}}" }],
+            "url": "{{baseUrl}}/api/schedule/{{scheduleItemId}}/reviews"
+          }
+        },
+        {
+          "name": "Create Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token_client}}" }
+            ],
+            "url": "{{baseUrl}}/api/schedule/{{scheduleItemId}}/reviews",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"booking_id\":{{bookingId}},\"rating\":5,\"comment\":\"Great\"}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
